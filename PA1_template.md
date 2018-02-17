@@ -69,14 +69,12 @@ We see distribution of steps taken per day in a histogram:
 
 
 ```r
-library(ggplot2)
 library(dplyr)
 totalActivityPerDay <- activityData %>% 
   group_by(date)%>% 
   summarize(total_steps_per_day = sum(steps,na.rm = TRUE))
 
-ggplot(totalActivityPerDay, aes(x = date, y = total_steps_per_day))+
-  geom_histogram(stat = "identity")
+hist(totalActivityPerDay$total_steps_per_day, border = TRUE, xlab = "Total steps per day",ylab = "Number Of days", main="Histogram Of Total Steps Per Day")
 ```
 
 ![](Figs/unnamed-chunk-6-1.png)<!-- -->
@@ -130,42 +128,19 @@ for(i in which(is.na(activityDataWON$steps))){
 
 #Drop the temporary column avgSteps by selecting others 
 activityDataWON <- select(activityDataWON, steps, date, interval)
-
-ggplot(activityDataWON, aes(x = date, y = steps))+
-  geom_histogram(stat = "identity")
+totalActivityPerDayWON <- activityData %>% group_by(date)%>% summarise(total_steps_per_day=sum(steps))
+hist(totalActivityPerDayWON$total_steps_per_day,border = TRUE, xlab = "Total steps per day",ylab = "Number Of days", main="Histogram Of Total Steps Per Day After Removing NAs")
 ```
 
 ![](Figs/unnamed-chunk-9-1.png)<!-- -->
-No visible diffrence is shown between two histograms with and without NA values. Because we replace NA with that day's average number of steps taken and no change is visible so it seems that if a day has NA then its all step entries are NAs thus every NA is replaced by zeros. Let's check it:
-
-```r
-activityData %>% 
-  filter(is.na(steps))%>% 
-  group_by(date)%>% 
-  summarise(totalNAs=n())
-```
-
-```
-# A tibble: 8 x 2
-  date       totalNAs
-  <date>        <int>
-1 2012-10-01      288
-2 2012-10-08      288
-3 2012-11-01      288
-4 2012-11-04      288
-5 2012-11-09      288
-6 2012-11-10      288
-7 2012-11-14      288
-8 2012-11-30      288
-```
-That's the reason, there are only 8 days when NA entries are present and they are present for all 288 intervals, so they are replaced by 0 and bring no change in total steps taken that day. 
-
+<br></br> As we can see, after imputing NAs by the mean steps of that day, height of first bin (0-5000)decreased and  height of third bin(10000=15000) is increased. 
 
 ## Are there differences in activity patterns between Days and weekends?
 
 To answer this question, we separate data into two partitions "DaysData" and "weekendsData"
 
 ```r
+library(ggplot2)
 library(lubridate)
 #Days starts with Monday and Saturday and Sundays are WeekEnds
 weekData <- activityDataWON %>%
@@ -176,7 +151,7 @@ weekData <- activityDataWON %>%
 ggplot(weekData, aes(x=interval, y=meanSteps))+geom_line()+facet_grid(weekData$Days~.)
 ```
 
-![](Figs/unnamed-chunk-11-1.png)<!-- -->
+![](Figs/unnamed-chunk-10-1.png)<!-- -->
 
 
 ```r
@@ -199,4 +174,4 @@ weekData%>%
 2 Weekends      153   915        0     0             37.7      10856
 ```
 <br></br> We can see a clear difference between the activity patterns during Days and during weekends. 
-The person remains more active in weekends as it takes on average 10856 steps in comprarion to 8820 steps on weekdays. The maximum value of average steps in any interval is observed in weekdays at 8:35 hrs. Average value of steps taken is higher in weekends by 7 steps per interval. 
+The person remains more active in weekends as it takes on average 10856 steps in comprarion to 8820 steps on weekdays. The maximum value of average steps in any interval is observed in weekdays at 8:35 hrs. Average value of steps taken is higher in weekend by around 7 steps per interval. 
