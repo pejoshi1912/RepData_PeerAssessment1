@@ -5,21 +5,144 @@ output:
     keep_md: true
 ---
 
+```{r global_options, include=FALSE}
+    library(knitr)
+    rm(list=ls())
+    opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/',
+               echo=TRUE, warning=FALSE, message=FALSE,comment="")
+```
 
 ## Loading and preprocessing the data
 
+The data file is in the zip format so first we unzip it and then read to get the data.
 
+```{r, warning=FALSE}
+unzip("activity.zip", exdir = ".")
+activityData <- read.csv("activity.csv")
+```
+
+Before starting the analysis let's have a look at the structure, summary, few records of the dataset to get a better understanding of the data.
+
+
+```{r}
+summary(activityData)
+```
+Intervals have a duration of 5 minutes each and every date has 288 intervals. There are 2304 NA's in steps, because median of steps is 0.00 it suggests that the data is right skewed and most of time person remains inactive.
+
+```{r}
+View(activityData)
+```
+Every hour is divided into 12 intervals of 5 minute starting from 0 to 55. Every interval comprises of hour and starting minute.(like 135 replresents 1:35 hrs)
+
+```{r}
+str(activityData)
+```
+<br></br>
+The *date* is stored as Factor so it would be better if we convert it into a Date class so that we can use lubridate package for day, week, month manipulation.
+
+```{r}
+library(lubridate)
+activityData$date <-ymd(activityData$date) 
+```
 
 ## What is mean total number of steps taken per day?
 
+We see distribution of steps taken per day in a histogram:
 
+```{r}
+library(ggplot2)
+library(dplyr)
+totalActivityPerDay <- activityData %>% 
+  group_by(date)%>% 
+  summarize(total_steps_per_day = sum(steps,na.rm = TRUE))
+
+ggplot(totalActivityPerDay, aes(x = date, y = total_steps_per_day))+
+  geom_histogram(stat = "identity")
+```
+Histogram shows a lot of variation in the steps taken on different days. 
+Now we calculate the mean and median of total steps taken per day during the entire period of monitoring
+
+```{r}
+summ <- totalActivityPerDay %>% 
+  summarise(mean_steps_per_day=mean(total_steps_per_day),
+            median_steps_per_day = median(total_steps_per_day))
+
+```
+The average number of steps taken per day is `r summ$mean_steps_per_day` and median is `r summ$median_steps_per_day`. 
 
 ## What is the average daily activity pattern?
 
+Here, we see on an average how many steps are taken in different intervals daily. We draw a time plot for average number of steps taken in every interval of 5 minutes (starting at 0 and  ending at 2355 minutes) during the monitoring period of 2 months.  
 
+```{r}
+timeData <- activityData %>%
+  group_by(interval) %>%
+  mutate(averageSteps=sum(steps,na.rm = TRUE)/n())
+with (timeData, 
+      plot(x= interval, y= averageSteps, type="l", xlim = c(0,2355)))
+
+maxstepInterval <- timeData$interval[which.max(timeData$averageSteps)] 
+hr <- maxstepInterval%/%100
+min <- maxstepInterval%%100
+```
+During the five minute interval that starts at `r hr`:`r min` hrs maximum average steps are taken daily.  
 
 ## Imputing missing values
+There are *(`r summary(activityData)[7,1]`)* instances when number of steps can't be recorded in the dataset so we replace these missing (NA) values by the mean steps taken in five minutes's interval in that particular day. 
+
+```{r}
+
+#Adding a temperary column for average steps in 5 minute interval in a day
+activityDataWON <- activityData %>%
+  group_by(date) %>%
+  mutate(avgSteps = sum(steps, na.rm=TRUE)/n())
+
+#Replace NA value by average steps in the day 
+for(i in which(is.na(activityDataWON$steps))){
+  activityDataWON$steps[i]=activityDataWON$avgSteps[i]
+}
+
+#Drop the temporary column avgSteps by selecting others 
+activityDataWON <- select(activityDataWON, steps, date, interval)
+
+ggplot(activityDataWON, aes(x = date, y = steps))+
+  geom_histogram(stat = "identity")
+
+```
+No visible diffrence is shown between two histograms with and without NA values. Because we replace NA with that day's average number of steps taken and no change is visible so it seems that if a day has NA then its all step entries are NAs thus every NA is replaced by zeros. Let's check it:
+```{r}
+activityData %>% 
+  filter(is.na(steps))%>% 
+  group_by(date)%>% 
+  summarise(totalNAs=n())
+```
+That's the reason, there are only 8 days when NA entries are present and they are present for all 288 intervals, so they are replaced by 0 and bring no change in total steps taken that day. 
 
 
+## Are there differences in activity patterns between Days and weekends?
 
-## Are there differences in activity patterns between weekdays and weekends?
+To answer this question, we separate data into two partitions "DaysData" and "weekendsData"
+```{r}
+library(lubridate)
+#Days starts with Monday and Saturday and Sundays are WeekEnds
+weekData <- activityDataWON %>%
+  mutate(Days=ifelse(wday(date,week_start = 1)<6,"Weekdays","Weekends"))%>%
+  group_by(Days,interval)%>% 
+  summarise(meanSteps=mean(steps))
+
+ggplot(weekData, aes(x=interval, y=meanSteps))+geom_line()+facet_grid(weekData$Days~.)
+```
+
+```{r}
+weekData%>% 
+  group_by(Days)%>% 
+  summarise(
+    maxSteps=max(meanSteps),
+    maxAt=interval[which.max(meanSteps)],
+    minSteps=min(meanSteps),
+    minAt=interval[which.min(meanSteps)],
+    meanAverageSteps=mean(meanSteps),
+    totalSteps=sum(meanSteps) )
+```
+<br></br> We can see a clear difference between the activity patterns during Days and during weekends. 
+The person remains more active in weekends as it takes on average 10856 steps in comprarion to 8820 steps on weekdays. The maximum value of average steps in any interval is observed in weekdays at 8:35 hrs. Average value of steps taken is higher in weekends by 7 steps per interval. 
